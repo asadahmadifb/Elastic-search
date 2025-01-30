@@ -54,3 +54,131 @@
         "match_all": {}
       }
     }
+
+    --------------------------------------------------------------
+    Install-Package NEST
+
+    var settings = new ConnectionSettings(new Uri("http://localhost:9200"))
+    .DefaultIndex("your_index_name");
+    var client = new ElasticClient(settings);
+
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+    }
+
+    var createIndexResponse = client.Indices.Create("products", c => c
+    .Map<Product>(m => m
+        .AutoMap()
+        )
+    );
+
+    var product = new Product { Id = 1, Name = "Sample Product", Price = 10.99M };
+    var indexResponse = client.IndexDocument(product);
+
+    var searchResponse = client.Search<Product>(s => s
+    .Query(q => q
+        .Match(m => m
+            .Field(f => f.Name)
+            .Query("Sample")
+            )
+        )
+    );
+
+        
+        1.	استفاده از Bulk API
+        2.	پیکربندی مپینگ‌های سفارشی
+        3.	استفاده از فیلترها
+        4.	استفاده از Aggregations
+        5.	پیکربندی ریپلیکیشن و شاردینگ
+        6.	استفاده از Scripted Fields
+        7.	پیاده‌سازی Paging و Sorting
+        8.	استفاده از Snippets
+        9.	مدیریت خطاها و Retry Policies
+    -------------------------------- اضافه کردن چندین سند به صورت همزمان-----------------------------
+    var products = new List<Product>
+    {
+        new Product { Id = 1, Name = "Product 1", Price = 10.99M },
+        new Product { Id = 2, Name = "Product 2", Price = 20.99M },
+        new Product { Id = 3, Name = "Product 3", Price = 30.99M }
+    };
+    
+    var bulkResponse = client.Bulk(b => b
+        .Index("products")
+        .IndexMany(products)
+    );
+    ----------------------------به‌روزرسانی و اضافه کردن اسناد---------------------------------
+    var bulkResponse = client.Bulk(b => b
+        .Index("products")
+        .Update<Product>(u => u
+            .Id("1")
+            .Doc(new Product { Price = 15.99M }) // به‌روزرسانی قیمت
+        )
+        .IndexDocument(new Product { Id = 4, Name = "Product 4", Price = 40.99M }) // اضافه کردن سند جدید
+    );
+    ----------------استفاده از عملیات شرطی--------------------------------------------------
+    var bulkResponse = client.Bulk(b => b
+    .Index("products")
+    .Update<Product>(u => u
+        .Id("3")
+        .Doc(new Product { Price = 35.99M }) // به‌روزرسانی قیمت
+        .Upsert(new Product { Id = 3, Name = "Product 3", Price = 35.99M }) // اگر وجود نداشت، اضافه کن
+        )
+    );
+            --------------------------------مپینگ داده ----------------------------------------------
+        var createIndexResponse = client.Indices.Create("products", c => c
+            .Map<Product>(m => m
+                .Properties(p => p
+                    .Text(t => t
+                        .Name(n => n.Name)
+                        .Analyzer("standard")
+                    )
+                    .Number(n => n
+                        .Name(n => n.Price)
+                        .Type(NumberType.Double)
+                    )
+                )
+            )
+        );
+        -----------------بازیابی کل داده ها --------------------------------------------------
+        var searchResponse = client.Search<Product>(s => s
+        .Query(q => q
+            .MatchAll() // بازیابی تمام اسناد
+            )
+        );
+        ------------------------------------------------------------------------------------------
+        var searchResponse = client.Search<Product>(s => s
+        .Query(q => q
+            .Bool(b => b
+                .Must(m => m
+                    .Match(mq => mq
+                        .Field(f => f.Name)
+                        .Query("Product A") // جستجوی دقیق نام محصول
+                    )
+                )
+                .Should(sh => sh
+                    .Match(mq => mq
+                        .Field(f => f.Description)
+                        .Query("special offer") // جستجوی قسمتی از متن در توضیحات
+                    )
+                )
+                .Filter(f => f
+                    .Bool(bf => bf
+                        .Must(
+                            mf => mf.Term(t => t.Category, "Electronics"), // فیلتر بر اساس دسته‌بندی
+                            mf => mf.Range(r => r
+                                .Field(p => p.Price)
+                                .GreaterThanOrEquals(100) // قیمت بیشتر یا مساوی 100
+                                .LessThan(500) // قیمت کمتر از 500
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+    ----------------------------------------------------------------------------------
+    .Match: جستجوی متنی و تطابق نزدیک. مناسب برای فیلدهای متنی.
+    .Term: جستجوی دقیق و تطابق کامل. مناسب برای فیلدهای غیرمتنی (keyword).
