@@ -87,6 +87,74 @@
         )
     );
 
+
+   ----------------------------------------
+   public class Comment
+    {
+        public string User { get; set; }
+        public string Message { get; set; }
+        public DateTime Date { get; set; }
+    }
+    
+    public class Instructor
+    {
+        public string Name { get; set; }
+        public List<Comment> Comments { get; set; }
+    }
+    
+    public class Course
+    {
+        public string CourseName { get; set; }
+        public List<Instructor> Instructors { get; set; }
+    }
+    
+    // تعریف مپینگ
+    var createIndexResponse = client.Indices.Create("courses", c => c
+        .Map<Course>(m => m
+            .Properties(ps => ps
+                .Text(t => t
+                    .Name(n => n.CourseName)
+                )
+                .Nested<Instructor>(n => n
+                    .Name(nn => nn.Instructors)
+                    .Properties(pn => pn
+                        .Keyword(k => k.Name(n => n.Name))
+                        .Nested<Comment>(cn => cn
+                            .Name(nc => nc.Comments)
+                            .Properties(pc => pc
+                                .Keyword(k => k.Name(c => c.User))
+                                .Text(t => t.Name(c => c.Message))
+                                .Date(d => d.Name(c => c.Date))
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+    
+    
+    var searchResponse = client.Search<Course>(s => s
+        .Query(q => q
+            .Nested(n => n
+                .Path(p => p.Instructors)
+                .Query(nq => nq
+                    .Bool(b => b
+                        .Must(
+                            mq => mq.Match(m => m.Field(f => f.Instructors.First().Name).Query("Alice")),
+                            nq => nq.Nested(nn => nn
+                                .Path(pn => pn.Instructors.First().Comments)
+                                .Query(nq2 => nq2
+                                    .Match(m => m.Field(f => f.Instructors.First().Comments.First().Message).Query("Great"))
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
         
         1.	استفاده از Bulk API
         2.	پیکربندی مپینگ‌های سفارشی
