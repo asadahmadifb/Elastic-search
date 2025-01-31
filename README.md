@@ -250,3 +250,53 @@
     ----------------------------------------------------------------------------------
     .Match: جستجوی متنی و تطابق نزدیک. مناسب برای فیلدهای متنی.
     .Term: جستجوی دقیق و تطابق کامل. مناسب برای فیلدهای غیرمتنی (keyword).
+
+    ------------------------------------ ایجاد یک فیلد بر اساس چندین شرط-------------------------------------------
+    ## Scripted Fields
+        در Elasticsearch، Scripted Fields معمولاً با استفاده از زبان Painless نوشته می‌شوند. Painless یک زبان اسکریپت‌نویسی سریع
+        و ایمن است که به طور خاص برای Elasticsearch طراحی شده است و برای نوشتن اسکریپت‌های پیچیده و کارآمد در جستجو و پردازش داده‌ها استفاده می‌شود.
+
+    var searchResponse = client.Search<Document>(s => s
+        .Index("your_index")
+        .Query(q => q
+            .MatchAll()
+        )
+        .ScriptFields(sf => sf
+            .ScriptField("risk_level", script => script
+                .Source(@"
+                    if (doc['score'].value < 50) {
+                        return 'High Risk';
+                    } else if (doc['score'].value < 75) {
+                        return 'Medium Risk';
+                    } else {
+                        return 'Low Risk';
+                    }
+                ")
+            )
+        )
+    );
+
+    -----------------------------------محاسبه سن بر اساس تاریخ تولد-----------------------------------
+    var searchResponse = client.Search<Document>(s => s
+    .Index("your_index")
+    .Query(q => q
+        .MatchAll()
+    )
+    .ScriptFields(sf => sf
+            .ScriptField("age", script => script
+                .Source("ChronoUnit.YEARS.between(doc['birth_date'].value, ZonedDateTime.now())")
+            )
+        )
+    );
+    -------------------------------ترکیب چند فیلد برای ایجاد یک فیلد جدید-------------------------------------------
+    var searchResponse = client.Search<Document>(s => s
+    .Index("your_index")
+    .Query(q => q
+        .MatchAll()
+    )
+    .ScriptFields(sf => sf
+            .ScriptField("full_address", script => script
+                .Source("doc['street'].value + ', ' + doc['city'].value + ' ' + doc['zip'].value")
+            )
+        )
+    );
