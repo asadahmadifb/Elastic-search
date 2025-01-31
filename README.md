@@ -300,3 +300,67 @@
             )
         )
     );
+
+    ------------------------snippets -------------------------------------------------
+    var searchResponse = client.Search<Document>(s => s
+    .Index("your_index")
+    .Query(q => q
+        .Match(m => m
+            .Field(f => f.Content)
+            .Query("search term")
+        )
+    )
+    .Highlight(h => h
+        .Fields(
+            f => f
+                .Field("content")
+                .PreTags("<strong>")
+                .PostTags("</strong>")
+        )
+        )
+    );
+          ---------------------------------------------مدیریت خطاها و Retry Policies---------------------------------------------
+      var settings = new ConnectionSettings(new Uri("http://localhost:9200"))
+    .DefaultIndex("your_index")
+    .RequestTimeout(TimeSpan.FromSeconds(30))
+    .MaximumRetries(3) // تعداد تلاش‌های مجدد
+    .RetryDelay(TimeSpan.FromSeconds(2)); // زمان بین تلاش‌ها
+
+    var client = new ElasticClient(settings);
+
+    --------------------------------
+    var settings = new ConnectionSettings(new Uri("http://localhost:9200"))
+    .DefaultIndex("your_index")
+    .RequestTimeout(TimeSpan.FromSeconds(30))
+    .MaximumRetries(3)
+    .CircuitBreakerOptions(new CircuitBreakerOptions
+    {
+        FailureThreshold = 0.5, // 50% از درخواست‌ها باید موفقیت‌آمیز باشند
+        MinimumThroughput = 10, // حداقل 10 درخواست در یک دوره
+        DurationOfBreak = TimeSpan.FromSeconds(30) // مدت زمان قطع
+    });
+
+    var client = new ElasticClient(settings);
+
+    ---------------------------------------------------
+    var bulkResponse = client.Bulk(b => b
+    .Index("your_index")
+    .IndexMany(documents)
+    );
+    
+    if (!bulkResponse.IsValid)
+    {
+        int retryCount = 0;
+        while (retryCount < 3 && !bulkResponse.IsValid)
+        {
+            retryCount++;
+            Console.WriteLine($"Bulk operation failed: {bulkResponse.OriginalException.Message}. Retrying {retryCount}/3...");
+            Thread.Sleep(2000); // انتظار 2 ثانیه قبل از تلاش مجدد
+    
+            bulkResponse = client.Bulk(b => b
+                .Index("your_index")
+                .IndexMany(documents)
+            );
+        }
+    }
+    
